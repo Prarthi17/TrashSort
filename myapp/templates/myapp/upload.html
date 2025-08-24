@@ -1,0 +1,214 @@
+{% extends 'myapp/base.html' %}
+{% block title %}ScrapSort - Detect{% endblock %}
+{% block head %}
+  <style>
+    :root { --muted:#6b7280; --text:#111827; --accent:#16a34a; }
+    *{box-sizing:border-box}
+    h1{font-size:22px; margin:0; color:var(--text)}
+    .card{background:#ffffff; border:1px solid #e5e7eb; border-radius:16px; padding:20px}
+    .grid{display:grid; grid-template-columns: 1fr 1fr; gap:20px}
+    @media (max-width:900px){ .grid{grid-template-columns: 1fr;} }
+    .section-title{font-size:14px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; margin:0 0 12px}
+    .uploader{border:1.5px dashed #d1d5db; border-radius:12px; padding:20px; text-align:center; background:#f8fafc}
+    .uploader p{margin:10px 0; color:var(--muted)}
+    .row{display:flex; gap:16px; flex-wrap:wrap; justify-content:center}
+    .col{flex:1 1 300px; min-width:280px; text-align:left}
+    .label{display:block; font-size:12px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; margin-bottom:8px}
+    .input{width:100%; padding:10px 12px; border-radius:10px; background:#ffffff; border:1px solid #d1d5db; color:var(--text)}
+    .input::placeholder{color:#9ca3af}
+    /* Custom file input */
+    .file-wrap{display:flex; align-items:center; gap:12px}
+    .file-input{position:absolute; left:-9999px}
+    .file-label{display:inline-flex; align-items:center; gap:10px; background:linear-gradient(135deg,#16a34a,#15803d); color:#ffffff; font-weight:700; padding:10px 16px; border-radius:10px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.08);}
+    .file-name{color:var(--muted); font-size:14px}
+    .btn{appearance:none; border:0; background:linear-gradient(135deg,#16a34a,#15803d); color:#ffffff; font-weight:700; padding:10px 16px; border-radius:10px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.08);}
+    .btn:disabled{opacity:.6; cursor:not-allowed}
+    .preview-wrap{display:flex; gap:16px;}
+    .imgbox{background:#f8fafc; border:1px solid #e5e7eb; border-radius:12px; padding:10px; display:flex; align-items:center; justify-content:center; min-height:320px}
+    img{max-width:100%; height:auto; border-radius:8px}
+    .meta{font-size:14px; color:var(--muted)}
+    .pill{display:inline-block; padding:4px 8px; border-radius:999px; background:rgba(22,163,74,.12); color:#065f46; border:1px solid rgba(22,163,74,.35)}
+    /* Larger pill variant for section headings */
+    .pill-lg{font-size:18px; font-weight:800; padding:10px 16px}
+    /* Heading for ScrapSort's Suggestion: big, bold, no background */
+    .heading-suggest{font-size:28px; font-weight:700; color:#16a34a; letter-spacing:.02em; margin:0 0 10px}
+    .error{color:#991b1b; background:#fee2e2; border:1px solid #fecaca; padding:10px 12px; border-radius:10px}
+    .note{color:#92400e; background:#fef3c7; border:1px solid #fde68a; padding:10px 12px; border-radius:10px}
+    /* Placeholder padding lines for min list length */
+    ul{ margin-top:4px; padding-left:18px }
+    li.pad{ color:transparent; user-select:none; line-height:1.6 }
+    li.pad::marker{ color:#d1d5db }
+  </style>
+{% endblock %}
+{% block content %}
+  <div id="upload" class="container">
+    <div class="header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px">
+      <div class="brand" style="display:flex; gap:12px; align-items:center">
+        <img src="/media/logo.avif" alt="ScrapSort logo" style="width:56px;height:56px;border-radius:12px;object-fit:cover" />
+        <h1>ScrapSort Inference</h1>
+      </div>
+      <div class="pill">ScrapSort Waste Detector</div>
+    </div>
+
+    {% if error %}
+      <div class="card" style="margin-bottom:16px"><div class="error">{{ error }}</div></div>
+    {% endif %}
+    {% if message %}
+      <div class="card" style="margin-bottom:16px"><div class="note">{{ message }}</div></div>
+    {% endif %}
+
+    <div class="card" style="margin-bottom:20px">
+      <p class="section-title">Upload</p>
+      <form class="uploader" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="row">
+          <div class="col">
+            <span class="label">1) Select a file</span>
+            <div class="file-wrap">
+              <label class="file-label">
+                <span>Choose file</span>
+                <input id="fileInput" class="file-input" type="file" name="image" accept="image/*,video/*" />
+              </label>
+              <span id="fileName" class="file-name">No file chosen</span>
+            </div>
+          </div>
+          <div class="col">
+            <span class="label">2) Or paste image URL</span>
+            <input class="input" type="url" name="image_url" placeholder="https://example.com/image.jpg" />
+          </div>
+        </div>
+        <p>Provide either a image or a direct URL. If both are provided, the file will be used.</p>
+        <button class="btn" type="submit">Run Detection</button>
+      </form>
+    </div>
+
+    <div class="grid">
+      <div id="originals" class="card">
+        <p class="section-title">Original</p>
+        <div class="imgbox">
+          {% if original_video_url %}
+            <video src="{{ original_video_url }}" controls style="max-width:100%; border-radius:8px"></video>
+          {% elif original_url %}
+            <img src="{{ original_url }}" alt="original" />
+          {% else %}
+            <div class="meta">Upload an image or video to preview here.</div>
+          {% endif %}
+        </div>
+      </div>
+      <div id="annotated" class="card">
+        <p class="section-title">Annotated Result</p>
+        <div class="imgbox">
+          {% if result_url %}
+            <img src="{{ result_url }}" alt="result" />
+          {% else %}
+            <div class="meta">Processed output will appear here.</div>
+          {% endif %}
+        </div>
+        {% if pred_class %}
+          <div class="meta" style="margin-top:10px">Prediction: <strong>{{ pred_class }}</strong> ({{ pred_conf }})</div>
+          {% if category %}
+            <div class="meta" style="margin-top:6px">Category: <span class="pill">{{ category }}</span></div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    {% if best_action or solutions_text %}
+    <div id="suggestions" class="card" style="margin-top:20px">
+      <div class="heading-suggest">ScrapSort’s Suggestion</div>
+      <div style="display:flex; gap:20px; align-items:flex-start">
+        <div style="flex:1 1 auto; min-width:0; text-align:left">
+
+      {% if best_action %}
+        <div style="color:#111827; margin-bottom:8px"><strong>Best Action:</strong> {{ best_action }}</div>
+
+        {% if best_action_details and best_action_details|length %}
+          <div style="color:#111827; font-weight:600; margin-top:8px">How to {{ best_action }}:</div>
+          <ul id="steps-list" style="color:#111827; margin-top:4px; padding-left:18px">
+            {% for step in best_action_details %}
+              <li>{{ step }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+
+        {% if other_suggestions and other_suggestions|length %}
+          <div style="color:#111827; font-weight:600; margin-top:10px">Other Suggestions:</div>
+          <ul id="tips-list" style="color:#111827; margin-top:4px; padding-left:18px">
+            {% for tip in other_suggestions %}
+              <li>{{ tip }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% else %}
+        <div style="white-space:pre-wrap; color:#111827; text-align:left">{{ solutions_text }}</div>
+      {% endif %}
+        </div>
+        <div style="flex:0 0 140px; display:flex; justify-content:center; align-items:center">
+          <img
+            src="{% if pred_class and pred_class|lower == 'glass' %}/media/yellow.png{% elif category == 'Recyclable' %}/media/blue.png{% elif category == 'Biodegradable' %}/media/green.png{% elif category and 'hazardous' in category|lower %}/media/red.png{% else %}/media/dustbin.png{% endif %}"
+            alt="category bin"
+            style="max-width:120px; height:auto" />
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if harm_text %}
+    <div id="harm" class="card" style="margin-top:20px">
+      <div class="heading-suggest">How harmfull this is to earth</div>
+      <div style="white-space:pre-wrap; color:#111827; display:block; width:100%; text-align:justify">{{ harm_text }}</div>
+    </div>
+    {% endif %}
+  </div>
+  <script>
+    // Update chosen file label
+    const fileInput = document.getElementById('fileInput');
+    const fileName = document.getElementById('fileName');
+    if (fileInput) {
+      fileInput.addEventListener('change', () => {
+        fileName.textContent = fileInput.files && fileInput.files.length ? fileInput.files[0].name : 'No file chosen';
+      });
+    }
+
+    // On submit, set a flag so after reload we scroll to results
+    const form = document.querySelector('form.uploader');
+    if (form) {
+      form.addEventListener('submit', () => {
+        // First scroll target after reload
+        sessionStorage.setItem('scrollAfterLoad', 'originals');
+      });
+    }
+
+    // After page loads: if suggestions exist, scroll there; otherwise if flagged, scroll to originals/annotated
+    window.addEventListener('DOMContentLoaded', () => {
+      const suggestions = document.getElementById('suggestions');
+      // Pad lists to minimum counts
+      const padList = (ul, minCount) => {
+        if (!ul) return;
+        const items = ul.querySelectorAll('li');
+        let count = items.length;
+        while (count < minCount) {
+          const li = document.createElement('li');
+          li.className = 'pad';
+          li.innerHTML = '&nbsp;';
+          ul.appendChild(li);
+          count++;
+        }
+      };
+      padList(document.getElementById('steps-list'), 8);
+      padList(document.getElementById('tips-list'), 12);
+
+      if (suggestions) {
+        suggestions.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        sessionStorage.removeItem('scrollAfterLoad');
+        return;
+      }
+      const flag = sessionStorage.getItem('scrollAfterLoad');
+      if (flag === 'originals') {
+        const target = document.getElementById('originals') || document.getElementById('annotated');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        sessionStorage.removeItem('scrollAfterLoad');
+      }
+    });
+  </script>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'myapp/base.html' %}
+{% block title %}ScrapSort - FAQ{% endblock %}
+{% block head %}
+<style>
+  .faq-wrap{max-width:980px; margin:20px auto;}
+  .faq-title{font-size:32px; font-weight:800; color:#111827; margin:0 0 14px}
+  .faq-sub{color:#6b7280; margin:0 0 24px}
+  details{background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 16px; margin-bottom:12px}
+  summary{font-weight:700; color:#111827; cursor:pointer}
+  summary::-webkit-details-marker{display:none}
+  .faq-a{color:#374151; margin-top:8px}
+  .ask-card{background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-top:18px}
+  .input{width:100%; padding:10px 12px; border-radius:10px; background:#ffffff; border:1px solid #d1d5db; color:#111827}
+  .btn{appearance:none; border:0; background:linear-gradient(135deg,#16a34a,#15803d); color:#ffffff; font-weight:700; padding:10px 16px; border-radius:10px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.08); display:inline-flex; align-items:center; gap:8px}
+  .arrow{display:inline-block; transform:translateY(1px)}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="faq-wrap">
+  <h1 class="faq-title">Frequently Asked Questions</h1>
+  <p class="faq-sub">Answers to common questions about ScrapSort.</p>
+
+  <details open>
+    <summary>What is ScrapSort?</summary>
+    <div class="faq-a">ScrapSort is a web app that detects waste items from images and provides actionable disposal and recycling guidance.</div>
+  </details>
+  <details>
+    <summary>How does it detect waste?</summary>
+    <div class="faq-a">We use the YOLOv8 model to identify the most likely material class, then generate guidance tailored to that class.</div>
+  </details>
+  <details>
+    <summary>How effective is it for people?</summary>
+    <div class="faq-a">It simplifies decision-making by recommending Reduce/Reuse/Recycle/Responsible Disposal, reducing contamination and improving recycling participation.</div>
+  </details>
+  <details>
+    <summary>What is the model's accuracy?</summary>
+    <div class="faq-a">Accuracy varies by material and image quality. We show a confidence score for transparency and recommend verifying locally for critical decisions.</div>
+  </details>
+  <details>
+    <summary>How does this solve a real problem?</summary>
+    <div class="faq-a">Mixed waste and poor sorting reduce recycling efficiency. ScrapSort guides users to handle items correctly, reducing landfill burden and emissions.</div>
+  </details>
+
+  <div class="ask-card">
+    <label class="label" for="question">Drop your question</label>
+    <form method="post" action="{% url 'contact' %}">
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="feedback" />
+      <textarea id="question" name="comments" class="input" rows="4" placeholder="Type your question..."></textarea>
+      <div style="margin-top:10px">
+        <button class="btn" type="submit">
+          Send
+          <span class="arrow">➜</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

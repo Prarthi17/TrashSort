@@ -1,0 +1,157 @@
+{% extends 'myapp/base.html' %}
+{% block title %}Scrap Price{% endblock %}
+{% block head %}
+<style>
+  .card{background:#ffffff; border:1px solid #e5e7eb; border-radius:16px; padding:20px}
+  .label{display:block; font-size:12px; letter-spacing:.08em; color:#6b7280; text-transform:uppercase; margin-bottom:8px}
+  .row{display:flex; gap:16px; flex-wrap:wrap}
+  .col{flex:1 1 260px; min-width:240px}
+  .input, select{width:100%; padding:10px 12px; border-radius:10px; background:#ffffff; border:1px solid #d1d5db; color:#111827}
+  .btn{appearance:none; border:0; background:linear-gradient(135deg,#16a34a,#15803d); color:#ffffff; font-weight:700; padding:10px 16px; border-radius:10px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.08)}
+  .meta{font-size:14px; color:#6b7280}
+  .error{color:#991b1b; background:#fee2e2; border:1px solid #fecaca; padding:10px 12px; border-radius:10px}
+  .result{background:#f0fdf4; border:1px solid #bbf7d0; color:#065f46; padding:12px 14px; border-radius:12px}
+  table{width:100%; border-collapse:collapse; margin-top:12px}
+  th,td{border:1px solid #e5e7eb; padding:8px 10px; text-align:left}
+  th{background:#f9fafb}
+  .section-title{font-size:14px; letter-spacing:.08em; color:#6b7280; text-transform:uppercase; margin:0 0 12px}
+  h1{margin:0 0 10px}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>Scrap Price Calculator</h1>
+
+  {% if error %}
+    <div class="card" style="margin-bottom:16px"><div class="error">{{ error }}</div></div>
+  {% endif %}
+
+  <div class="card" style="margin-bottom:16px">
+    <p class="section-title">Enter an item to compare prices</p>
+    <form method="get">
+      <div class="row" style="align-items:flex-end">
+        <div class="col">
+          <label class="label" for="item">Item</label>
+          <input class="input" id="item" name="item" type="text" placeholder="e.g., iron, copper, aluminium" value="{{ item }}" />
+        </div>
+        <div>
+          <button class="btn" type="submit">Check Prices</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {% if show_weight %}
+    <div class="card" style="margin-bottom:16px">
+      <p class="section-title">Calculate Estimated Value</p>
+      <div class="row" style="align-items:flex-end">
+        <div class="col">
+          <label class="label" for="weight">Weight (kg)</label>
+          <input class="input" id="weight" name="weight" type="number" step="0.01" min="0" placeholder="e.g., 5" value="{{ weight }}" />
+        </div>
+        <div>
+          <button class="btn" type="button" id="calcBtn">Calculate Price</button>
+        </div>
+      </div>
+      <div class="meta" style="margin-top:8px">
+        {% if top_site and max_price %}
+          Using highest price <strong>{{ max_price }}</strong> (₹/kg) from <strong>{{ top_site }}</strong>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <p class="section-title">Results Table</p>
+      {% if table and table|length > 0 %}
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Website</th>
+              <th>Price (₹/kg)</th>
+              <th>Link</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in table %}
+              <tr>
+                <td>{{ row.Item }}</td>
+                <td>{{ row.Website }}</td>
+                <td>{{ row.Price }}</td>
+                <td><a href="{{ row.Link }}" target="_blank" rel="noopener">Visit</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="meta">No results to display.</div>
+      {% endif %}
+    </div>
+
+    {% if graph %}
+      <div class="card" style="margin-bottom:16px">
+        <p class="section-title">Price Comparison Graph</p>
+        <img alt="Price graph" src="data:image/png;base64,{{ graph }}" style="max-width:100%; height:auto; border-radius:8px" />
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <div class="card" style="margin-top:16px">
+    <p class="section-title">Helpful Links</p>
+    <div class="meta">Bulk waste management</div>
+    <ul>
+      {% for s in bulk_sites %}
+        <li><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.name }}</a></li>
+      {% endfor %}
+    </ul>
+    <div class="meta" style="margin-top:8px">Scrap price sources</div>
+    <ul>
+      {% for s in scrap_sites %}
+        <li><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.name }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<script>
+  (function(){
+    // Calculate button
+    var calcBtn = document.getElementById('calcBtn');
+    if (calcBtn) {
+      calcBtn.addEventListener('click', function(){
+        var weightEl = document.getElementById('weight');
+        var weight = parseFloat((weightEl && weightEl.value) || '');
+        var maxPrice = {{ max_price|default:'null' }};
+        var topSite = {% if top_site %}"{{ top_site|escapejs }}"{% else %}null{% endif %};
+        if (!weight || weight <= 0) {
+          alert('Enter a valid weight (kg).');
+          return;
+        }
+        if (maxPrice === null) {
+          alert('No prices available to calculate.');
+          return;
+        }
+        var total = weight * maxPrice;
+        // Show result below form
+        var container = document.querySelector('.container');
+        var card = document.createElement('div');
+        card.className = 'card';
+        card.style.marginBottom = '16px';
+        card.innerHTML = '<p class="section-title">Calculated Price</p>'+
+          '<div class="result">'+
+          'Weight: <strong>' + weight.toFixed(2) + ' kg</strong><br />'+
+          'Max Price: <strong>' + maxPrice + ' ₹/kg</strong>' + (topSite ? ' (at <strong>' + topSite + '</strong>)' : '') + '<br />'+
+          'Total: <strong>' + total.toFixed(2) + ' ₹</strong>'+
+          '</div>';
+        // Insert after the first card (search form)
+        var formCard = document.querySelectorAll('.card')[0];
+        if (formCard && formCard.parentNode) {
+          formCard.parentNode.insertBefore(card, formCard.nextSibling);
+        } else if (container) {
+          container.insertBefore(card, container.firstChild);
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

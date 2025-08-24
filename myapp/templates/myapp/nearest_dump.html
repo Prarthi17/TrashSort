@@ -1,0 +1,175 @@
+{% extends 'myapp/base.html' %}
+{% block title %}Nearest Dump Yard{% endblock %}
+{% block head %}
+<style>
+  .panel { background:#ffffff; border:1px solid #e5e7eb; border-radius:14px; padding:16px; margin-bottom:16px }
+  label { font-size:.95rem; color:#111827 }
+  input[type="text"] { width: min(520px, 95%); padding:.6rem .8rem; border-radius:10px; border:1px solid #d1d5db; background:#ffffff; color:#111827 }
+  button { background:#16a34a; color:white; border:none; padding:.6rem 1rem; border-radius:10px; cursor:pointer; margin-left:.5rem }
+  button:hover { filter:brightness(.95) }
+  #map { width:100%; height:520px; border-radius:14px; border:1px solid #e5e7eb }
+  .results { margin-top:1rem; display:grid; gap:.75rem }
+  .card { background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:.75rem 1rem }
+  .badge { display:inline-block; padding:.1rem .5rem; border-radius:999px; background:#0ea5e9; color:#00121d; font-size:.8rem; font-weight:700 }
+  .nearest { background:#22c55e; color:#052e13 }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>Find Nearest Dump Yard</h1>
+
+  <div class="panel">
+    <form id="searchForm" onsubmit="return false;">
+      <label>Search by city and area:</label>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:6px;">
+        <input id="city" type="text" placeholder="City (e.g., Ahmedabad)" style="flex:1 1 240px;" />
+        <input id="area" type="text" placeholder="Area/Locality (e.g., Bopal)" style="flex:2 1 320px;" />
+        <button onclick="findByCityArea()">Find</button>
+      </div>
+      <div style="margin-top:10px;">
+        <button type="button" onclick="findByGPS()">Use My Location</button>
+      </div>
+    </form>
+    <div id="status" style="margin-top:.6rem; opacity:.9;"></div>
+  </div>
+
+  <div id="map" class="panel"></div>
+
+  <div class="panel">
+    <h3 style="margin-top:0;">Results</h3>
+    <div id="results" class="results"></div>
+  </div>
+</div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_JS_KEY }}"></script>
+<script>
+  let map, bounds, originMarker, placeMarkers = [];
+  let directionsService, directionsRenderer;
+  let origin = null; // {lat, lng}
+  let nearest = null; // nearest place obj from API
+
+  function initMap(center = {lat: 20.5937, lng: 78.9629}, zoom = 5) {
+    map = new google.maps.Map(document.getElementById('map'), { center, zoom });
+    bounds = new google.maps.LatLngBounds();
+    directionsService = new google.maps.DirectionsService();
+    directionsRenderer = new google.maps.DirectionsRenderer({ suppressMarkers: true });
+    directionsRenderer.setMap(map);
+  }
+
+  function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+  function clearMap() {
+    if (originMarker) originMarker.setMap(null);
+    placeMarkers.forEach(m => m.setMap(null));
+    placeMarkers = [];
+    directionsRenderer.set('directions', null);
+    bounds = new google.maps.LatLngBounds();
+  }
+
+  function addOriginMarker(pos) {
+    originMarker = new google.maps.Marker({
+      position: pos,
+      map,
+      title: "Your location",
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#0ea5e9', fillOpacity: 1, strokeColor: '#0ea5e9' }
+    });
+    bounds.extend(pos);
+  }
+
+  function addPlaceMarker(p, isNearest=false) {
+    const marker = new google.maps.Marker({
+      position: {lat: p.lat, lng: p.lng},
+      map,
+      title: p.name,
+      icon: isNearest ? undefined : { path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 5 }
+    });
+    const info = new google.maps.InfoWindow({ content: `<b>${p.name}</b><br>${p.address || ""}<br>${p.distance_text} • ${p.duration_text}` });
+    marker.addListener('click', () => info.open(map, marker));
+    placeMarkers.push(marker);
+    bounds.extend(marker.getPosition());
+  }
+
+  function drawRoute(from, to) {
+    directionsService.route({
+      origin: from,
+      destination: { lat: to.lat, lng: to.lng },
+      travelMode: google.maps.TravelMode.DRIVING
+    }, (res, status) => { if (status === "OK") directionsRenderer.setDirections(res); });
+  }
+
+  async function callAPI(params) {
+    const url = `/api/find_dumpyards/?${params}`;
+    const resp = await fetch(url);
+    let data;
+    try { data = await resp.json(); } catch(e) { return { error: 'Bad response from server' } }
+    if (!resp.ok && data && data.error) return data;
+    return data;
+  }
+
+  function renderResults(data) {
+    const list = document.getElementById('results');
+    list.innerHTML = "";
+    if (!data.places || data.places.length === 0) { list.innerHTML = `<div class="card">No nearby dump yards found.</div>`; return; }
+    data.places.forEach((p, idx) => {
+      const nearestBadge = idx === 0 ? `<span class="badge nearest">Nearest</span>` : "";
+      list.innerHTML += `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-weight:700;">${p.name} ${nearestBadge}</div>
+              <div>${p.address || ""}</div>
+              <div style="opacity:.9;">${p.distance_text} • ${p.duration_text}${p.rating ? " • ⭐ " + p.rating : ""}</div>
+            </div>
+            <div>
+              <button onclick='focusPlace(${JSON.stringify(p.lat)}, ${JSON.stringify(p.lng)})'>Show</button>
+            </div>
+          </div>
+        </div>`;
+    });
+  }
+
+  function focusPlace(lat, lng) { map.panTo({lat, lng}); map.setZoom(15); }
+
+  async function handleSearch(params, originPosText="") {
+    setStatus("Searching nearby dump yards...");
+    clearMap();
+    const data = await callAPI(params);
+    if (data.error) { setStatus(`${data.error}${data.address_tried ? ` | tried: ${data.address_tried}` : ''}${data.hint ? ` | ${data.hint}` : ''}`); return; }
+    origin = data.origin;
+    nearest = data.nearest;
+    initMap({lat: origin.lat, lng: origin.lng}, 13);
+    addOriginMarker({lat: origin.lat, lng: origin.lng});
+    if (data.places && data.places.length > 0) {
+      data.places.forEach((p, i) => addPlaceMarker(p, i === 0));
+      map.fitBounds(bounds);
+      if (nearest) drawRoute(origin, nearest);
+      setStatus(`Found ${data.places.length} place(s). ${originPosText}`);
+    } else {
+      setStatus("No nearby dump yards found.");
+    }
+    renderResults(data);
+  }
+
+  function findByCityArea() {
+    const city = document.getElementById('city').value.trim();
+    const area = document.getElementById('area').value.trim();
+    if (!city && !area) return setStatus("Please enter city or area.");
+    const params = new URLSearchParams();
+    if (city) params.append('city', city);
+    if (area) params.append('area', area);
+    handleSearch(params.toString(), `Origin set by ${area ? 'area, ' : ''}${city ? 'city' : ''}.`);
+  }
+
+  function findByGPS() {
+    if (!navigator.geolocation) return setStatus("Geolocation not supported in this browser.");
+    setStatus("Getting your current location…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { const { latitude, longitude } = pos.coords; handleSearch(`lat=${latitude}&lng=${longitude}`, `Using your current location.`); },
+      (err) => setStatus("Failed to get location: " + err.message),
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }
+
+  window.onload = () => initMap();
+</script>
+{% endblock %}

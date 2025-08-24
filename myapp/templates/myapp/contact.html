@@ -1,0 +1,100 @@
+{% extends 'myapp/base.html' %}
+{% block title %}Contact Us{% endblock %}
+{% block head %}
+<style>
+  .card{background:#ffffff; border:1px solid #e5e7eb; border-radius:16px; padding:20px}
+  .label{display:block; font-size:12px; letter-spacing:.08em; color:#6b7280; text-transform:uppercase; margin-bottom:8px}
+  .row{display:flex; gap:16px; flex-wrap:wrap}
+  .col{flex:1 1 260px; min-width:240px}
+  .input, select, textarea{width:100%; padding:10px 12px; border-radius:10px; background:#ffffff; border:1px solid #d1d5db; color:#111827}
+  .btn{appearance:none; border:0; background:linear-gradient(135deg,#16a34a,#15803d); color:#ffffff; font-weight:700; padding:10px 16px; border-radius:10px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.08)}
+  .meta{font-size:14px; color:#6b7280}
+  .error{color:#991b1b; background:#fee2e2; border:1px solid #fecaca; padding:10px 12px; border-radius:10px}
+  .result{background:#f0fdf4; border:1px solid #bbf7d0; color:#065f46; padding:12px 14px; border-radius:12px}
+  .section-title{font-size:14px; letter-spacing:.08em; color:#6b7280; text-transform:uppercase; margin:0 0 12px}
+  h1{margin:0 0 10px}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>Contact Us</h1>
+  <p class="meta" style="max-width:720px">Have questions, feature requests, or found an issue? Send us a message or leave feedback below.</p>
+
+  {% if form_error %}<div class="card" style="margin:12px 0"><div class="error">{{ form_error }}</div></div>{% endif %}
+
+  <div style="display:grid; grid-template-columns:1fr; gap:20px; max-width:900px;">
+    <div class="card">
+      <p class="section-title">Send a message</p>
+      {% if contact_success %}<div class="result" style="margin-bottom:12px">Thanks! Your message has been sent.</div>{% endif %}
+      {% if contact_error %}<div class="error" style="margin-bottom:12px">{{ contact_error }}</div>{% endif %}
+      <form method="post" action="{% url 'contact' %}">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="contact" />
+        <div class="row" style="align-items:flex-end; margin-bottom:12px">
+          <div class="col">
+            <label class="label" for="c_name">Your name</label>
+            <input class="input" id="c_name" name="name" type="text" placeholder="e.g., Alex" required />
+          </div>
+          <div class="col">
+            <label class="label" for="c_email">Your email</label>
+            <input class="input" id="c_email" name="email" type="email" placeholder="e.g., alex@mail.com" required />
+          </div>
+        </div>
+        <div class="row" style="align-items:flex-end; margin-bottom:12px">
+          <div class="col">
+            <label class="label" for="c_subject">Subject</label>
+            <input class="input" id="c_subject" name="subject" type="text" placeholder="Subject" required />
+          </div>
+        </div>
+        <div class="row" style="margin-bottom:12px">
+          <div class="col" style="min-width:100%">
+            <label class="label" for="c_message">Message</label>
+            <textarea class="input" id="c_message" name="message" placeholder="Your message" rows="5" required></textarea>
+          </div>
+        </div>
+        <button class="btn" type="submit">Send</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <p class="section-title">Leave feedback</p>
+      {% if feedback_success %}<div class="result" style="margin-bottom:12px">Thank you for your feedback!</div>{% endif %}
+      {% if feedback_error %}<div class="error" style="margin-bottom:12px">{{ feedback_error }}</div>{% endif %}
+      <form method="post" action="{% url 'contact' %}">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="feedback" />
+        <div class="row" style="align-items:flex-end; margin-bottom:12px">
+          <div class="col">
+            <label class="label" for="f_name">Your name</label>
+            <input class="input" id="f_name" name="name" type="text" placeholder="e.g., Priya" required />
+          </div>
+          <div class="col">
+            <label class="label" for="f_email">Your email (optional)</label>
+            <input class="input" id="f_email" name="email" type="email" placeholder="e.g., priya@mail.com" />
+          </div>
+        </div>
+        <div class="row" style="align-items:flex-end; margin-bottom:12px">
+          <div class="col">
+            <label class="label" for="f_rating">Rating</label>
+            <select class="input" id="f_rating" name="rating" required>
+              <option value="">Select…</option>
+              <option value="5">5 - Excellent</option>
+              <option value="4">4 - Good</option>
+              <option value="3">3 - Okay</option>
+              <option value="2">2 - Poor</option>
+              <option value="1">1 - Bad</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" style="margin-bottom:12px">
+          <div class="col" style="min-width:100%">
+            <label class="label" for="f_comments">Feedback</label>
+            <textarea class="input" id="f_comments" name="comments" placeholder="Your feedback (optional)" rows="4"></textarea>
+          </div>
+        </div>
+        <button class="btn" type="submit">Submit</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
